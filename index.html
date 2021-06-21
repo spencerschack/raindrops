@@ -42,6 +42,7 @@
           }
         }
         for (const light of lights) {
+          let [x, y] = [0, 0]
           for (const drop of drops) {
             const dx = drop.x - light.x;
             const dy = drop.y - light.y;
@@ -54,8 +55,10 @@
               waveFunction(distance / drop.wake) * drop.amplitude;
             const stretch =
               magnitude * Math.max(0, (drop.size - drop.radius) / drop.size);
-            if (stretch > 0) light.draw(angle, stretch);
+            x += Math.cos(angle) * stretch;
+            y += Math.sin(angle) * stretch;
           }
+          if (x !== 0 || y !== 0) light.draw(x, y)
         }
       }
       function drop() {
@@ -64,14 +67,15 @@
           y: window.innerHeight * Math.random(),
           radius: 0,
           wake: 150,
-          size: 100 + 100 * Math.random(),
-          speed: 5000,
-          amplitude: 20,
+          size: 200 + 100 * Math.random(),
+          speed: 4000,
+          amplitude: 70,
         };
       }
       function waveFunction(x) {
+        const [shift, amplitude] = x < 1/6 ? [1, 1/2] : [0, 1]
         return (
-          ((Math.cos(6 * Math.PI * x + Math.PI) + 1) / 2) * Math.pow(1 - x, 1.5)
+          ((Math.cos(6 * Math.PI * x + Math.PI) + shift) * amplitude) * Math.pow(1 - x, 2)
         );
       }
       function* times(n, build) {
@@ -89,9 +93,9 @@
       function light(x, y) {
         const graphics = new PIXI.Graphics();
         app.stage.addChild(graphics);
-        draw(0, 0);
+        draw(0.000001, 0);
         return { draw, x, y };
-        function draw(angle, stretch) {
+        function draw(dx, dy) {
           const ratio = y / window.innerHeight;
           const hsl1 = rgbToHsl(0x5b, 0xf2, 0x91);
           const hsl2 = rgbToHsl(0xa6, 0x67, 0xba);
@@ -104,10 +108,7 @@
             width: 4,
             cap: PIXI.LINE_CAP.ROUND,
           });
-          let dx = Math.cos(angle) * stretch;
-          let dy = Math.sin(angle) * stretch;
-          if (dx === 0) dx = 0.000001;
-          graphics.moveTo(x - dx, y - dy);
+          graphics.moveTo(x, y);
           graphics.lineTo(x + dx, y + dy);
         }
       }

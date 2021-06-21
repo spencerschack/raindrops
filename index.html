@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>raindrops</title>
+    <script src="https://pixijs.download/v5.3.10/pixi.min.js"></script>
+  </head>
+  <body>
+    <style>
+      body {
+        margin: 0;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        display: block;
+      }
+    </style>
+    <script>
+      const app = new PIXI.Application({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        resolution: window.devicePixelRatio || 1,
+        antialias: true,
+      });
+      window.addEventListener("resize", () => {
+        app.renderer.resize(window.innerWidth, window.innerHeight);
+      });
+      PIXI.Ticker.shared.add(render);
+      const lights = [...drawLights()];
+      const drops = [];
+      function render(delta) {
+        if (Math.random() < 0.2) {
+          drops.push(drop());
+        }
+        for (let index = 0; index < drops.length; index++) {
+          drops[index].radius += drops[index].speed * (delta / 1000);
+          if (drops[index].radius > drops[index].size + drops[index].wake) {
+            drops.splice(index, 1);
+            index--;
+          }
+        }
+        for (const light of lights) {
+          for (const drop of drops) {
+            const dx = drop.x - light.x;
+            const dy = drop.y - light.y;
+            const angle = Math.atan2(dy, dx);
+            let distance = Math.min(
+              drop.wake,
+              Math.max(0, drop.radius - Math.sqrt(dx * dx + dy * dy))
+            );
+            const magnitude =
+              waveFunction(distance / drop.wake) * drop.amplitude;
+            const stretch =
+              magnitude * Math.max(0, (drop.size - drop.radius) / drop.size);
+            if (stretch > 0) light.draw(angle, stretch);
+          }
+        }
+      }
+      function drop() {
+        return {
+          x: window.innerWidth * Math.random(),
+          y: window.innerHeight * Math.random(),
+          radius: 0,
+          wake: 150,
+          size: 100 + 100 * Math.random(),
+          speed: 5000,
+          amplitude: 20,
+        };
+      }
+      function waveFunction(x) {
+        return (
+          ((Math.cos(6 * Math.PI * x + Math.PI) + 1) / 2) * Math.pow(1 - x, 1.5)
+        );
+      }
+      function* times(n, build) {
+        for (let i = 0; i < n; i++) {
+          yield build(n);
+        }
+      }
+      function* drawLights() {
+        const [width, height] = [window.innerWidth, window.innerHeight];
+        const count = Math.floor((width * height) / 500);
+        yield* times(count, () =>
+          light(width * Math.random(), height * Math.random())
+        );
+      }
+      function light(x, y) {
+        const graphics = new PIXI.Graphics();
+        app.stage.addChild(graphics);
+        draw(0, 0);
+        return { draw, x, y };
+        function draw(angle, stretch) {
+          const ratio = y / window.innerHeight;
+          const hsl1 = rgbToHsl(0x5b, 0xf2, 0x91);
+          const hsl2 = rgbToHsl(0xa6, 0x67, 0xba);
+          const hsl = hsl1.map((c, i) => (hsl2[i] - c) * ratio + c);
+          const rgb = hslToRgb(...hsl);
+          const color = (rgb[0] << 16) + (rgb[1] << 8) + rgb[2];
+          graphics.clear();
+          graphics.lineStyle({
+            color,
+            width: 4,
+            cap: PIXI.LINE_CAP.ROUND,
+          });
+          let dx = Math.cos(angle) * stretch;
+          let dy = Math.sin(angle) * stretch;
+          if (dx === 0) dx = 0.000001;
+          graphics.moveTo(x - dx, y - dy);
+          graphics.lineTo(x + dx, y + dy);
+        }
+      }
+      document.body.appendChild(app.view);
+      function createGradTexture() {
+        const quality = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = quality;
+        canvas.height = 1;
+        const ctx = canvas.getContext("2d");
+        const grd = ctx.createLinearGradient(0, 0, quality, 0);
+        grd.addColorStop(0, "#756463");
+        grd.addColorStop(1, "#554145");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, quality, 1);
+        return PIXI.Texture.from(canvas);
+      }
+
+      const gradTexture = createGradTexture();
+
+      const sprite = new PIXI.Sprite(gradTexture);
+      sprite.position.set(window.innerWidth, 0);
+      sprite.rotation = Math.PI / 2;
+      sprite.width = window.innerHeight;
+      sprite.height = window.innerWidth;
+      app.stage.addChildAt(sprite, 0);
+      function rgbToHsl(r, g, b) {
+        (r /= 255), (g /= 255), (b /= 255);
+        var max = Math.max(r, g, b),
+          min = Math.min(r, g, b);
+        var h,
+          s,
+          l = (max + min) / 2;
+
+        if (max == min) {
+          h = s = 0; // achromatic
+        } else {
+          var d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r:
+              h = (g - b) / d + (g < b ? 6 : 0);
+              break;
+            case g:
+              h = (b - r) / d + 2;
+              break;
+            case b:
+              h = (r - g) / d + 4;
+              break;
+          }
+          h /= 6;
+        }
+
+        return [h, s, l];
+      }
+      function hslToRgb(h, s, l) {
+        var r, g, b;
+
+        if (s == 0) {
+          r = g = b = l; // achromatic
+        } else {
+          var hue2rgb = function hue2rgb(p, q, t) {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+          };
+
+          var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          var p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1 / 3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1 / 3);
+        }
+
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+      }
+    </script>
+  </body>
+</html>
